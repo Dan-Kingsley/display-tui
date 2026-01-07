@@ -173,6 +173,8 @@ impl<'a> MonitorList<'a> {
                     instructions_items.push(" Enable ".white());
                     instructions_items.push("<e> ".blue().bold());
                 }
+                instructions_items.push(" Refresh ".white());
+                instructions_items.push("<f> ".blue().bold());
             },
 
             TUIMode::Resolution=> {
@@ -296,7 +298,7 @@ mod tests {
             "┃     Monitor 1         Description 1                   1920x1080         (0,0)      1           normal     ┃",
             "┃     Monitor 2         Description 2                   1280x720          (1920,0)   1.25        normal     ┃",
             "┃                                                                                                            ┃",
-            "┗━━━━ Up <k>  Down <j>  Move <m>  Resolution <r>  Scale <s>  Rotate <o>  Disable <d>  Save <w>  Quit <q> ━━━━┛",
+            "┗p <k>  Down <j>  Move <m>  Resolution <r>  Scale <s>  Rotate <o>  Disable <d>  Refresh <f>  Save <w>  Quit <┛",
         ]);
 
         let border_style = Style::new().fg(Color::Yellow);
@@ -342,26 +344,28 @@ mod tests {
         expected.set_style(Rect::new(109, 5, 1, 1), border_style);
 
         // last line : instructions
-        expected.set_style(Rect::new(0, 6, 5, 1), border_style);
-        expected.set_style(Rect::new(5, 6, 4, 1), instructions_label_style);
-        expected.set_style(Rect::new(9, 6, 4, 1), instructions_key_style);
-        expected.set_style(Rect::new(13, 6, 6, 1), instructions_label_style);
-        expected.set_style(Rect::new(19, 6, 4, 1), instructions_key_style);
-        expected.set_style(Rect::new(23, 6, 6, 1), instructions_label_style);
-        expected.set_style(Rect::new(29, 6, 4, 1), instructions_key_style);
-        expected.set_style(Rect::new(33, 6, 12, 1), instructions_label_style);
-        expected.set_style(Rect::new(45, 6, 4, 1), instructions_key_style);
-        expected.set_style(Rect::new(49, 6, 7, 1), instructions_label_style);
-        expected.set_style(Rect::new(56, 6, 4, 1), instructions_key_style);
-        expected.set_style(Rect::new(60, 6, 8, 1), instructions_label_style);
-        expected.set_style(Rect::new(68, 6, 4, 1), instructions_key_style);
-        expected.set_style(Rect::new(72, 6, 9, 1), instructions_label_style);
-        expected.set_style(Rect::new(81, 6, 4, 1), instructions_key_style);
-        expected.set_style(Rect::new(85, 6, 6, 1), instructions_label_style);
-        expected.set_style(Rect::new(91, 6, 4, 1), instructions_key_style);
-        expected.set_style(Rect::new(95, 6, 6, 1), instructions_label_style);
-        expected.set_style(Rect::new(101, 6, 4, 1), instructions_key_style);
-        expected.set_style(Rect::new(105, 6, 5, 1), border_style);
+        expected.set_style(Rect::new(0, 6, 1, 1), border_style);
+        expected.set_style(Rect::new(1, 6, 2, 1), instructions_label_style);
+        expected.set_style(Rect::new(3, 6, 4, 1), instructions_key_style);
+        expected.set_style(Rect::new(7, 6, 6, 1), instructions_label_style);
+        expected.set_style(Rect::new(13, 6, 4, 1), instructions_key_style);
+        expected.set_style(Rect::new(17, 6, 6, 1), instructions_label_style);
+        expected.set_style(Rect::new(23, 6, 4, 1), instructions_key_style);
+        expected.set_style(Rect::new(27, 6, 12, 1), instructions_label_style);
+        expected.set_style(Rect::new(39, 6, 4, 1), instructions_key_style);
+        expected.set_style(Rect::new(43, 6, 7, 1), instructions_label_style);
+        expected.set_style(Rect::new(50, 6, 4, 1), instructions_key_style);
+        expected.set_style(Rect::new(54, 6, 8, 1), instructions_label_style);
+        expected.set_style(Rect::new(62, 6, 4, 1), instructions_key_style);
+        expected.set_style(Rect::new(66, 6, 9, 1), instructions_label_style);
+        expected.set_style(Rect::new(75, 6, 4, 1), instructions_key_style);
+        expected.set_style(Rect::new(79, 6, 9, 1), instructions_label_style);
+        expected.set_style(Rect::new(88, 6, 4, 1), instructions_key_style);
+        expected.set_style(Rect::new(92, 6, 6, 1), instructions_label_style);
+        expected.set_style(Rect::new(98, 6, 4, 1), instructions_key_style);
+        expected.set_style(Rect::new(102, 6, 6, 1), instructions_label_style);
+        expected.set_style(Rect::new(108, 6, 1, 1), instructions_key_style);
+        expected.set_style(Rect::new(109, 6, 1, 1), border_style);
 
         assert_eq!(buf, expected);
     }

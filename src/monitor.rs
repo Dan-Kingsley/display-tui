@@ -187,6 +187,83 @@ impl Monitor {
         Ok(())
     }
 
+    pub fn load_from_hyprland_config(path: &str, monitors: &mut Vec<Monitor>) {
+        let expanded_path = shellexpand::tilde(path).to_string();
+        if let Ok(content) = std::fs::read_to_string(expanded_path) {
+            for line in content.lines() {
+                let line = line.trim();
+                if !line.starts_with("monitor") {
+                    continue;
+                }
+                let parts: Vec<&str> = line
+                    .splitn(2, '=')
+                    .nth(1)
+                    .unwrap_or("")
+                    .split(',')
+                    .map(|s| s.trim())
+                    .collect();
+
+                if parts.len() < 2 {
+                    continue;
+                }
+
+                let name = parts[0];
+                if let Some(monitor) = monitors.iter_mut().find(|m| m.name == name) {
+                    if parts[1] == "disabled" {
+                        monitor.enabled = false;
+                        continue;
+                    }
+
+                    monitor.enabled = true;
+
+                    // Resolution: e.g. 1920x1080@60 or 1920x1080 or preferred
+                    if let Some(res_part) = parts.get(1) {
+                        if let Some(pos) = monitor.modes.iter().position(|m| {
+                            let full = format!("{}x{}@{}", m.width, m.height, m.refresh);
+                            let short = format!("{}x{}", m.width, m.height);
+                            res_part == &full || res_part == &short
+                        }) {
+                            monitor.set_current_resolution(pos);
+                        } else if *res_part == "preferred" || *res_part == "highres" {
+                            if let Some(pref_pos) = monitor.modes.iter().position(|m| m.preferred) {
+                                monitor.set_current_resolution(pref_pos);
+                            }
+                        }
+                    }
+
+                    // Position: e.g. 0x0 or 1920x0
+                    if let Some(pos_part) = parts.get(2) {
+                        let coords: Vec<&str> = pos_part.split('x').collect();
+                        if coords.len() == 2 {
+                            if let (Ok(x), Ok(y)) = (coords[0].parse::<i32>(), coords[1].parse::<i32>()) {
+                                monitor.position = Some(Position { x, y });
+                            }
+                        }
+                    }
+
+                    // Scale: e.g. 1 or 1.5
+                    if let Some(scale_part) = parts.get(3) {
+                        if let Ok(scale) = scale_part.parse::<f32>() {
+                            monitor.scale = Some(scale);
+                        }
+                    }
+
+                    // Transform: e.g. transform, 1
+                    if parts.len() >= 6 && parts[4] == "transform" {
+                        if let Ok(rot_id) = parts[5].parse::<i32>() {
+                            monitor.transform = Some(match rot_id {
+                                1 => "90".to_string(),
+                                2 => "180".to_string(),
+                                3 => "270".to_string(),
+                                _ => "normal".to_string(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     pub fn move_vertical(&mut self, direction: i32) {
         if let Some(ref mut pos) = self.position { pos.y += direction};
     }

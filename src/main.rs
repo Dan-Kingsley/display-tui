@@ -48,8 +48,9 @@ struct App {
 impl App{
     pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
         self.monitors = Monitor::get_monitors();
-        
-        // Load saved monitor positions/scales
+        self.config = Configuration::get();
+
+        // Load saved monitor positions/scales from monitor_state.json (backward compatibility)
         if let Some(saved_states) = Configuration::load_monitor_state() {
             for monitor in &mut self.monitors {
                 if let Some(saved_state) = saved_states.iter().find(|s| s.name == monitor.name) {
@@ -62,10 +63,13 @@ impl App{
                 }
             }
         }
+
+        // Load from Hyprland config (the "actual configuration file")
+        // This takes precedence over monitor_state.json
+        Monitor::load_from_hyprland_config(&self.config.monitors_config_path, &mut self.monitors);
         
         self.selected_resolution= 0;
         self.selected_monitor= 0;
-        self.config = Configuration::get();
 
         while !self.exit {
             terminal.draw(|frame| self.draw(frame))?;
@@ -93,6 +97,7 @@ impl App{
             KeyCode::Char('q') => self.exit(),
             KeyCode::Char('c') if key_event.modifiers.contains(KeyModifiers::CONTROL) => self.exit(),
             KeyCode::Char('w') => self.write(), 
+            KeyCode::Char('f') => self.refresh(),
             _ => {
                 match self.mode {
                     TUIMode::View => MonitorList::handle_events(self,key_event),
@@ -110,6 +115,33 @@ impl App{
             eprintln!("Warning: Failed to save monitor state on exit: {}", e);
         }
         self.exit = true;
+    }
+
+    fn refresh(&mut self) {
+        self.monitors = Monitor::get_monitors();
+        self.config = Configuration::get();
+        
+        // Also reload from monitor_state.json to be consistent with run()
+        if let Some(saved_states) = Configuration::load_monitor_state() {
+            for monitor in &mut self.monitors {
+                if let Some(saved_state) = saved_states.iter().find(|s| s.name == monitor.name) {
+                    if let Some(pos) = &saved_state.position {
+                        monitor.position = Some(pos.clone());
+                    }
+                    if let Some(scale) = saved_state.scale {
+                        monitor.scale = Some(scale);
+                    }
+                }
+            }
+        }
+
+        // Load from Hyprland config (the "actual configuration file")
+        // This takes precedence over monitor_state.json
+        Monitor::load_from_hyprland_config(&self.config.monitors_config_path, &mut self.monitors);
+        
+        self.selected_resolution= 0;
+        self.selected_monitor= 0;
+        self.status_message = "✓ Configuration refreshed".to_string();
     }
     
     fn write(&mut self) {
