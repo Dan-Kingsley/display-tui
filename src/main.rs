@@ -1,9 +1,9 @@
 use std::io;
-use crossterm::event::{self,Event,KeyCode,KeyEvent,KeyEventKind};
+use crossterm::event::{self,Event,KeyCode,KeyEvent,KeyEventKind, KeyModifiers};
 use ratatui::{
     buffer::Buffer,
     layout::Rect,
-    widgets::Widget,
+    widgets::{Widget, Paragraph},
     DefaultTerminal,Frame,
 };
 use ratatui::prelude::*;
@@ -42,6 +42,7 @@ struct App {
     selected_resolution : usize,
     selected_scale: usize,
     mode: TUIMode,
+    status_message: String,
 }
 
 impl App{
@@ -117,8 +118,8 @@ impl App{
         ).expect("Failed to save Hyprland config");
         
         match Configuration::save_monitor_state(&self.monitors) {
-            Ok(_) => eprintln!("✓ Monitor state saved successfully"),
-            Err(e) => eprintln!("✗ Failed to save monitor state: {}", e),
+            Ok(_) => self.status_message = "✓ Monitor state saved successfully".to_string(),
+            Err(e) => self.status_message = format!("✗ Failed to save monitor state: {}", e),
         }
     }         
 }
@@ -126,6 +127,16 @@ impl App{
 impl Widget for &App {
 
     fn render(self,area: Rect, buf: &mut Buffer) {
+        let chunks = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints(vec![
+                Constraint::Min(0),
+                Constraint::Length(1),
+            ])
+            .split(area);
+        let area = chunks[0];
+        let status_area = chunks[1];
+
         let mut monitor_list = MonitorList::new(
             &self.monitors,
             self.mode,
@@ -179,6 +190,7 @@ impl Widget for &App {
             }
         }
         monitor_list.render(outer_layout[1], buf);
+        Paragraph::new(self.status_message.as_str()).render(status_area, buf);
     }
 }
 
