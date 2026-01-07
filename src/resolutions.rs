@@ -34,7 +34,7 @@ impl<'a> Resolutions<'a> {
             KeyCode::Char('k') | KeyCode::Up => Resolutions::previous(app),
             KeyCode::Char('j') | KeyCode::Down => Resolutions::next(app),
             KeyCode::Char(' ')=> Resolutions::select(app),
-            KeyCode::Esc => Resolutions::change_mode(app,TUIMode::View),
+            KeyCode::Esc | KeyCode::Char('r') => Resolutions::change_mode(app,TUIMode::View),
             _ => {}
         }
     }

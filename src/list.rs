@@ -183,7 +183,7 @@ impl<'a> MonitorList<'a> {
                 instructions_items.push(" Select ".white());
                 instructions_items.push("<Space> ".blue().bold());
                 instructions_items.push(" Quit Resolution Mode ".white());
-                instructions_items.push("<Esc> ".blue().bold());
+                instructions_items.push("<Esc>/<r> ".blue().bold());
             },
 
             TUIMode::Move => {
@@ -198,7 +198,7 @@ impl<'a> MonitorList<'a> {
                 instructions_items.push(" Right ".white());
                 instructions_items.push("<l> ".blue().bold());
                 instructions_items.push(" Quit Move Mode ".white());
-                instructions_items.push("<Esc> ".blue().bold());
+                instructions_items.push("<Esc>/<m> ".blue().bold());
             },
             TUIMode::Scale => {
                 instructions_items.push(" Up ".white());
@@ -208,7 +208,7 @@ impl<'a> MonitorList<'a> {
                 instructions_items.push(" Select ".white());
                 instructions_items.push("<Space> ".blue().bold());
                 instructions_items.push(" Quit Scale Mode ".white());
-                instructions_items.push("<Esc> ".blue().bold());
+                instructions_items.push("<Esc>/<s> ".blue().bold());
             },
         }
 

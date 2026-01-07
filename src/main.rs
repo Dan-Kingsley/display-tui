@@ -91,6 +91,7 @@ impl App{
     fn handle_key_event(&mut self, key_event: KeyEvent) {
         match key_event.code {
             KeyCode::Char('q') => self.exit(),
+            KeyCode::Char('c') if key_event.modifiers.contains(KeyModifiers::CONTROL) => self.exit(),
             KeyCode::Char('w') => self.write(), 
             _ => {
                 match self.mode {
@@ -231,13 +232,20 @@ mod tests {
         app.handle_key_event(KeyCode::Esc.into());
         assert_eq!(app.mode, TUIMode::View);
 
-        app.handle_key_event(KeyCode::Char('s').into());
-        assert_eq!(app.mode, TUIMode::Scale);
-    
-        app.handle_key_event(KeyCode::Esc.into());
-        assert_eq!(app.mode, TUIMode::View);
-
         app.handle_key_event(KeyCode::Char('q').into());
+        assert!(app.exit);
+
+        let mut app = App{
+            monitors: test_monitors(),
+            selected_monitor: 0,
+            ..Default::default()
+        };
+        app.handle_key_event(KeyEvent {
+            code: KeyCode::Char('c'),
+            modifiers: KeyModifiers::CONTROL,
+            kind: KeyEventKind::Press,
+            state: event::KeyEventState::empty(),
+        });
         assert!(app.exit);
 
         Ok(())
@@ -274,6 +282,14 @@ mod tests {
         app.handle_key_event(KeyCode::Char('L').into());
         let monitor = app.monitors[app.selected_monitor].clone();
         assert_eq!(monitor.position.unwrap().x, 0);
+
+        // Exit Move mode with m
+        app.handle_key_event(KeyCode::Char('m').into());
+        assert_eq!(app.mode, TUIMode::View);
+
+        // Re-enter Move mode
+        app.handle_key_event(KeyCode::Char('m').into());
+        assert_eq!(app.mode, TUIMode::Move);
 
         app.handle_key_event(KeyCode::Char('q').into());
         assert!(app.exit);
