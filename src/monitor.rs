@@ -173,7 +173,15 @@ impl Monitor {
         }
         
     }
-    pub fn save_hyprland_config(path:&String,monitors: &Vec<Monitor>) -> std::io::Result<()> {
+    pub fn save_hyprland_config(path: &str, monitors: &Vec<Monitor>) -> std::io::Result<()> {
+        if Monitor::is_lua_config(path) {
+            Monitor::save_lua_config(path, monitors)
+        } else {
+            Monitor::save_traditional_config(path, monitors)
+        }
+    }
+
+    fn save_traditional_config(path: &str, monitors: &Vec<Monitor>) -> std::io::Result<()> {
         let expanded_path = shellexpand::tilde(path).to_string();
         let mut file = std::fs::OpenOptions::new()
             .write(true)
@@ -187,7 +195,69 @@ impl Monitor {
         Ok(())
     }
 
+    fn save_lua_config(path: &str, monitors: &Vec<Monitor>) -> std::io::Result<()> {
+        let expanded_path = shellexpand::tilde(path).to_string();
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .truncate(true)
+            .create(true)
+            .open(expanded_path)?;
+
+        writeln!(file, "-- Monitor wiki https://wiki.hypr.land/Configuring/Basics/Monitors/")?;
+        writeln!(file)?;
+
+        for monitor in monitors {
+            let block = monitor.to_lua_monitor_block();
+            writeln!(file, "{}", block)?;
+        }
+        Ok(())
+    }
+
+    fn to_lua_monitor_block(&self) -> String {
+        if self.enabled {
+            let mode = match self.get_current_resolution() {
+                Some(m) => format!("{}x{}@{}", m.width, m.height, m.refresh),
+                None => "preferred".to_string(),
+            };
+            let pos = match &self.position {
+                Some(p) => format!("{}x{}", p.x, p.y),
+                None => "0x0".to_string(),
+            };
+            let scale = self.scale.unwrap_or(1.0);
+            let scale_str = if scale == scale.floor() {
+                format!("{}", scale as i32)
+            } else {
+                format!("{}", scale)
+            };
+            format!(
+                "hl.monitor({{\n    output    = \"{}\",\n    mode      = \"{}\",\n    position  = \"{}\",\n    scale     = \"{}\",\n}})",
+                self.name, mode, pos, scale_str
+            )
+        } else {
+            format!(
+                "hl.monitor({{\n    output    = \"{}\",\n    mode      = \"disabled\",\n}})",
+                self.name
+            )
+        }
+    }
+
+    pub fn is_lua_config(path: &str) -> bool {
+        path.ends_with(".lua")
+    }
+
     pub fn load_from_hyprland_config(path: &str, monitors: &mut Vec<Monitor>) {
+        let expanded_path = shellexpand::tilde(path).to_string();
+        if !std::path::Path::new(&expanded_path).exists() {
+            return;
+        }
+        if Monitor::is_lua_config(path) {
+            Monitor::load_from_lua_config(path, monitors);
+        } else {
+            Monitor::load_from_traditional_config(path, monitors);
+        }
+    }
+
+    fn load_from_traditional_config(path: &str, monitors: &mut Vec<Monitor>) {
         let expanded_path = shellexpand::tilde(path).to_string();
         if let Ok(content) = std::fs::read_to_string(expanded_path) {
             for line in content.lines() {
@@ -262,6 +332,128 @@ impl Monitor {
                 }
             }
         }
+    }
+
+    fn load_from_lua_config(path: &str, monitors: &mut Vec<Monitor>) {
+        let expanded_path = shellexpand::tilde(path).to_string();
+        let content = match std::fs::read_to_string(&expanded_path) {
+            Ok(c) => c,
+            Err(_) => return,
+        };
+
+        // Find all hl.monitor({...}) blocks
+        let mut block_start = 0;
+        while let Some(start) = content[block_start..].find("hl.monitor(") {
+            let abs_start = block_start + start;
+            // Find the matching closing paren
+            let block_content = &content[abs_start..];
+            let mut depth = 0;
+            let mut block_end = 0;
+            for (i, ch) in block_content.char_indices() {
+                match ch {
+                    '(' => depth += 1,
+                    ')' => {
+                        depth -= 1;
+                        if depth == 0 {
+                            block_end = i + 1;
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            if block_end == 0 {
+                break;
+            }
+
+            let block = &content[abs_start..abs_start + block_end];
+            Monitor::parse_lua_monitor_block(block, monitors);
+            block_start = abs_start + block_end;
+        }
+    }
+
+    fn parse_lua_monitor_block(block: &str, monitors: &mut Vec<Monitor>) {
+        // Extract field values from the block
+        let output = Monitor::extract_lua_field(block, "output");
+        let mode = Monitor::extract_lua_field(block, "mode");
+        let position = Monitor::extract_lua_field(block, "position");
+        let scale = Monitor::extract_lua_field(block, "scale");
+
+        let name = match output {
+            Some(n) => n,
+            None => return,
+        };
+
+        let monitor = match monitors.iter_mut().find(|m| m.name == name) {
+            Some(m) => m,
+            None => return,
+        };
+
+        // Mode
+        if let Some(ref mode_val) = mode {
+            if mode_val == "disabled" {
+                monitor.enabled = false;
+                return;
+            }
+            monitor.enabled = true;
+
+            if mode_val == "preferred" || mode_val == "highres" {
+                if let Some(pref_pos) = monitor.modes.iter().position(|m| m.preferred) {
+                    monitor.set_current_resolution(pref_pos);
+                }
+            } else if let Some(pos) = monitor.modes.iter().position(|m| {
+                let full = format!("{}x{}@{}", m.width, m.height, m.refresh);
+                let short = format!("{}x{}", m.width, m.height);
+                mode_val == &full || mode_val == &short
+            }) {
+                monitor.set_current_resolution(pos);
+            }
+        }
+
+        // Position
+        if let Some(ref pos_val) = position {
+            if pos_val != "auto" {
+                let coords: Vec<&str> = pos_val.split('x').collect();
+                if coords.len() == 2 {
+                    if let (Ok(x), Ok(y)) = (coords[0].parse::<i32>(), coords[1].parse::<i32>()) {
+                        monitor.position = Some(Position { x, y });
+                    }
+                }
+            }
+        }
+
+        // Scale
+        if let Some(ref scale_val) = scale {
+            if scale_val != "auto" {
+                if let Ok(s) = scale_val.parse::<f32>() {
+                    monitor.scale = Some(s);
+                }
+            }
+        }
+    }
+
+    fn extract_lua_field(block: &str, field_name: &str) -> Option<String> {
+        // Find the field name followed by = and extract the value
+        for line in block.lines() {
+            let trimmed = line.trim();
+            if let Some(rest) = trimmed.strip_prefix(field_name) {
+                let rest = rest.trim();
+                if let Some(eq_rest) = rest.strip_prefix('=') {
+                    let value = eq_rest.trim();
+                    // Take value up to comma or end of line
+                    let value = value.split(|c: char| c == ',').next()?.trim();
+                    // Remove quotes if present
+                    if (value.starts_with('"') && value.ends_with('"'))
+                        || (value.starts_with('\'') && value.ends_with('\''))
+                    {
+                        return Some(value[1..value.len() - 1].to_string());
+                    } else {
+                        return Some(value.to_string());
+                    }
+                }
+            }
+        }
+        None
     }
 
     pub fn move_vertical(&mut self, direction: i32) {

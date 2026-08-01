@@ -66,13 +66,32 @@ impl Configuration {
     }
 
     fn create_default_config(config_json_path: &PathBuf) -> Self {
-        let default_monitors_config_path = "~/.config/hypr/hyprland/monitors.conf";
-        let default_config =format!("{{\n  \"monitors_config_path\": \"{}\"\n}}", default_monitors_config_path);
+        let monitors_config_path = Configuration::detect_monitors_config_path();
+        let default_config = format!("{{\n  \"monitors_config_path\": \"{}\"\n}}", monitors_config_path);
         fs::create_dir_all(config_json_path.parent().unwrap()).expect("Failed to create config directory");
         fs::write(config_json_path, default_config).expect("Failed to write default config file");
         Configuration {
-            monitors_config_path: default_monitors_config_path.to_string(),
+            monitors_config_path,
         } 
+    }
+
+    fn detect_monitors_config_path() -> String {
+        let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("~"));
+
+        // CachyOS / Lua config path
+        let lua_path = home.join(".config/hypr/config/monitors.lua");
+        if lua_path.exists() {
+            return "~/.config/hypr/config/monitors.lua".to_string();
+        }
+
+        // Traditional Hyprland config path
+        let traditional_path = home.join(".config/hypr/hyprland/monitors.conf");
+        if traditional_path.exists() {
+            return "~/.config/hypr/hyprland/monitors.conf".to_string();
+        }
+
+        // Default to traditional path if neither exists
+        "~/.config/hypr/hyprland/monitors.conf".to_string()
     }
     fn load_config() -> Self {
         let config_json_path = dirs::home_dir()
@@ -82,9 +101,19 @@ impl Configuration {
         let config_content = fs::read_to_string(config_json_path)
             .expect("Failed to read config file");
         
-        let config: Configuration = serde_json::from_str(&config_content)
+        let mut config: Configuration = serde_json::from_str(&config_content)
             .expect("Failed to parse config file");
-        
+
+        // If configured path doesn't exist, try to auto-detect
+        let expanded = shellexpand::tilde(&config.monitors_config_path).to_string();
+        if !std::path::Path::new(&expanded).exists() {
+            let detected = Configuration::detect_monitors_config_path();
+            let detected_expanded = shellexpand::tilde(&detected).to_string();
+            if std::path::Path::new(&detected_expanded).exists() {
+                config.monitors_config_path = detected;
+            }
+        }
+
         config
     }
 }
