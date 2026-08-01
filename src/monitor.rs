@@ -229,10 +229,18 @@ impl Monitor {
             } else {
                 format!("{}", scale)
             };
-            format!(
-                "hl.monitor({{\n    output    = \"{}\",\n    mode      = \"{}\",\n    position  = \"{}\",\n    scale     = \"{}\",\n}})",
-                self.name, mode, pos, scale_str
-            )
+            let transform = Rotation::from_transform(&self.transform).to_hyprland();
+            if transform != 0 {
+                format!(
+                    "hl.monitor({{\n    output    = \"{}\",\n    mode      = \"{}\",\n    position  = \"{}\",\n    scale     = \"{}\",\n    transform = {},\n}})",
+                    self.name, mode, pos, scale_str, transform
+                )
+            } else {
+                format!(
+                    "hl.monitor({{\n    output    = \"{}\",\n    mode      = \"{}\",\n    position  = \"{}\",\n    scale     = \"{}\",\n}})",
+                    self.name, mode, pos, scale_str
+                )
+            }
         } else {
             format!(
                 "hl.monitor({{\n    output    = \"{}\",\n    mode      = \"disabled\",\n}})",
@@ -378,6 +386,7 @@ impl Monitor {
         let mode = Monitor::extract_lua_field(block, "mode");
         let position = Monitor::extract_lua_field(block, "position");
         let scale = Monitor::extract_lua_field(block, "scale");
+        let transform = Monitor::extract_lua_field(block, "transform");
 
         let name = match output {
             Some(n) => n,
@@ -428,6 +437,18 @@ impl Monitor {
                 if let Ok(s) = scale_val.parse::<f32>() {
                     monitor.scale = Some(s);
                 }
+            }
+        }
+
+        // Transform (0=normal, 1=90, 2=180, 3=270)
+        if let Some(ref transform_val) = transform {
+            if let Ok(rot_id) = transform_val.parse::<i32>() {
+                monitor.transform = Some(match rot_id {
+                    1 => "90".to_string(),
+                    2 => "180".to_string(),
+                    3 => "270".to_string(),
+                    _ => "normal".to_string(),
+                });
             }
         }
     }
